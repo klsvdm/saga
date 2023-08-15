@@ -7,8 +7,9 @@ import (
 )
 
 var (
-	ErrAlreadyStarted = errors.New("saga is already started")
-	ErrCancelled      = errors.New("saga was cancelled")
+	ErrAlreadyStarted     = errors.New("saga is already started")
+	ErrCancelled          = errors.New("saga was cancelled")
+	ErrUnexpectedDataType = errors.New("unexpected data type")
 )
 
 type Step[Data any, Result any] interface {
@@ -61,7 +62,10 @@ func AddStep[Data, Result, R any](saga *Saga[R], step Step[Data, Result]) {
 		Exec: func(ctx context.Context, data any) (any, error) {
 			typedData, ok := data.(Data)
 			if !ok {
-				return nil, fmt.Errorf("unexpected data type '%T'", data)
+				return nil, errors.Join(
+					ErrUnexpectedDataType,
+					fmt.Errorf("want '%T', got '%T'", typedData, data),
+				)
 			}
 
 			return step.Exec(ctx, typedData)
@@ -92,7 +96,10 @@ func AddStepWithData[Data, R any](saga *Saga[R], step StepWithData[Data]) {
 		Exec: func(ctx context.Context, data any) (any, error) {
 			typedData, ok := data.(Data)
 			if !ok {
-				return nil, fmt.Errorf("unexpected data type '%T'", data)
+				return nil, errors.Join(
+					ErrUnexpectedDataType,
+					fmt.Errorf("want '%T', got '%T'", typedData, data),
+				)
 			}
 
 			return nil, step.Exec(ctx, typedData)
@@ -154,7 +161,10 @@ func (s *Saga[Result]) Result() (Result, error) {
 
 	typedResult, ok := s.result.(Result)
 	if !ok {
-		return empty, fmt.Errorf("result has unxpected data type '%T', want '%T'", s.result, empty)
+		return empty, errors.Join(
+			ErrUnexpectedDataType,
+			fmt.Errorf("want '%T', got '%T'", empty, s.result),
+		)
 	}
 
 	return typedResult, nil
