@@ -50,6 +50,11 @@ func AddStep[Data, Result, R any](saga *Saga[R], step Step[Data, Result]) {
 
 	saga.steps = append(saga.steps, sagaStep{
 		Exec: func(ctx context.Context, data any) (any, error) {
+			if data == nil {
+				var empty Data
+				return step.Exec(ctx, empty)
+			}
+
 			typedData, ok := data.(Data)
 			if !ok {
 				return nil, errors.Join(
