@@ -17,16 +17,6 @@ type Step[Data any, Result any] interface {
 	Revoke(ctx context.Context) error
 }
 
-type StepWithResult[Result any] interface {
-	Exec(ctx context.Context) (Result, error)
-	Revoke(ctx context.Context) error
-}
-
-type StepWithData[Data any] interface {
-	Exec(ctx context.Context, data Data) error
-	Revoke(ctx context.Context) error
-}
-
 type (
 	stepExecFunc   func(ctx context.Context, data any) (any, error)
 	stepRevokeFunc func(ctx context.Context) error
@@ -74,44 +64,12 @@ func AddStep[Data, Result, R any](saga *Saga[R], step Step[Data, Result]) {
 	})
 }
 
-func AddStepWithResult[Result, R any](saga *Saga[R], step StepWithResult[Result]) {
-	if saga == nil || step == nil {
-		return
-	}
-
-	saga.steps = append(saga.steps, sagaStep{
-		Exec: func(ctx context.Context, data any) (any, error) {
-			return step.Exec(ctx)
-		},
-		Revoke: step.Revoke,
-	})
-}
-
-func AddStepWithData[Data, R any](saga *Saga[R], step StepWithData[Data]) {
-	if saga == nil || step == nil {
-		return
-	}
-
-	saga.steps = append(saga.steps, sagaStep{
-		Exec: func(ctx context.Context, data any) (any, error) {
-			typedData, ok := data.(Data)
-			if !ok {
-				return nil, errors.Join(
-					ErrUnexpectedDataType,
-					fmt.Errorf("want '%T', got '%T'", typedData, data),
-				)
-			}
-
-			return nil, step.Exec(ctx, typedData)
-		},
-		Revoke: step.Revoke,
-	})
-}
-
 func (s *Saga[Result]) Run(ctx context.Context, opts ...Option) (err error) {
 	if s.canceled != nil {
 		return ErrAlreadyStarted
 	}
+
+	ctx = context.WithValue(ctx, sagaKey{}, s)
 
 	s.canceled = make(chan struct{})
 	s.result = nil
